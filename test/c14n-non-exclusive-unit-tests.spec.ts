@@ -117,6 +117,31 @@ describe("C14N non-exclusive canonicalization tests", function () {
     test_findAncestorNs(xml, xpath, expected);
   });
 
+  it("findAncestorNs: Should not hoist default namespace when subset also declares a prefixed namespace", function () {
+    // child2 is in the default namespace (inherited from root) and also
+    // declares xmlns:enc.  The default namespace must not be hoisted because
+    // the C14N serializer already renders it; previously findNSPrefix stopped
+    // at the first xmlns:* attribute ("enc") and missed the inherited "".
+    const xml =
+      "<root xmlns='bbb'><child1><child2 xmlns:enc='ccc'></child2></child1></root>";
+    const xpath = "//*[local-name()='child2']";
+    const expected = [];
+
+    test_findAncestorNs(xml, xpath, expected);
+  });
+
+  it("findAncestorNs: Should hoist non-default ancestor namespaces when subset is in default namespace", function () {
+    // child2 is in the default namespace and declares xmlns:enc, but its
+    // ancestor also declares xmlns:aaa which child2 does not redeclare.
+    // xmlns:aaa must still be hoisted; only the default namespace is suppressed.
+    const xml =
+      "<root xmlns='bbb' xmlns:aaa='zzz'><child1><child2 xmlns:enc='ccc'></child2></child1></root>";
+    const xpath = "//*[local-name()='child2']";
+    const expected = [{ prefix: "aaa", namespaceURI: "zzz" }];
+
+    test_findAncestorNs(xml, xpath, expected);
+  });
+
   // Tests for c14nCanonicalization
   it("C14n: Correctly picks up root ancestor namespace", function () {
     const xml = "<root xmlns:aaa='bbb'><child1><child2></child2></child1></root>";
@@ -207,6 +232,21 @@ describe("C14N non-exclusive canonicalization tests", function () {
       "<root xmlns='bbb'><child1><cc:child2 xmlns:cc='ddd'><cc:child3></cc:child3></cc:child2></child1></root>";
     const xpath = "//*[local-name()='child3']";
     const expected = '<cc:child3 xmlns="bbb" xmlns:cc="ddd"></cc:child3>';
+
+    test_C14nCanonicalization(xml, xpath, expected);
+  });
+
+  it("C14n: Should not produce duplicate default namespace when subset declares a prefixed namespace", function () {
+    // child2 is in the default namespace and also declares xmlns:enc.
+    // The C14N output must contain exactly one xmlns="bbb" declaration.
+    // Previously findNSPrefix returned "enc" (the first xmlns:* attribute),
+    // leaving the default namespace in the ancestor list; the C14N serializer
+    // then rendered it twice — once from the element itself and once from the
+    // hoisted ancestor entry.
+    const xml =
+      "<root xmlns='bbb'><child1><child2 xmlns:enc='ccc'></child2></child1></root>";
+    const xpath = "//*[local-name()='child2']";
+    const expected = '<child2 xmlns="bbb" xmlns:enc="ccc"></child2>';
 
     test_C14nCanonicalization(xml, xpath, expected);
   });

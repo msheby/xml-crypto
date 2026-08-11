@@ -221,15 +221,35 @@ function collectAncestorNamespaces(
   return collectAncestorNamespaces(parent, nsArray);
 }
 
-function findNSPrefix(subset) {
+/**
+ * Collect all namespace prefixes declared directly on a subset element.
+ *
+ * This includes every `xmlns:*` attribute on the element as well as the
+ * element's own namespace prefix (or `""` for the default namespace). The
+ * result is used by {@link findAncestorNs} to decide which ancestor namespace
+ * declarations are already in scope and therefore must not be hoisted onto the
+ * subset root during non-exclusive C14N.
+ *
+ * The previous single-return implementation (`findNSPrefix`) stopped at the
+ * *first* `xmlns:*` attribute, so elements that declare more than one
+ * namespace (e.g. `<Body xmlns:enc="…">` in the default namespace) caused the
+ * inherited default namespace to be hoisted even though the C14N serializer
+ * already renders it, producing a duplicate `xmlns="…"` declaration.
+ */
+function findSubsetNSPrefixes(subset: Element): Set<string> {
+  const prefixes = new Set<string>();
   const subsetAttributes = subset.attributes;
   for (let k = 0; k < subsetAttributes.length; k++) {
     const nodeName = subsetAttributes[k].nodeName;
-    if (nodeName.search(/^xmlns:?/) !== -1) {
-      return nodeName.replace(/^xmlns:?/, "");
+    if (/^xmlns:?/.test(nodeName)) {
+      prefixes.add(nodeName.replace(/^xmlns:?/, ""));
     }
   }
-  return subset.prefix || "";
+  // Always include the element's own prefix (empty string for the default
+  // namespace) so that the C14N serializer's own rendering of that namespace
+  // is not duplicated by hoisting.
+  prefixes.add(subset.prefix || "");
+  return prefixes;
 }
 
 function isElementSubset(docSubset: Node[]): docSubset is Element[] {
@@ -283,9 +303,9 @@ export function findAncestorNs(
 
   // Remove namespaces which are already declared in the subset with the same prefix
   const returningNs: NamespacePrefix[] = [];
-  const subsetNsPrefix = findNSPrefix(docSubset[0]);
+  const subsetNsPrefixes = findSubsetNSPrefixes(docSubset[0]);
   for (const ancestorNs of ancestorNsWithoutDuplicate) {
-    if (ancestorNs.prefix !== subsetNsPrefix) {
+    if (!subsetNsPrefixes.has(ancestorNs.prefix)) {
       returningNs.push(ancestorNs);
     }
   }
