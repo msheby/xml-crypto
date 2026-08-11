@@ -431,9 +431,7 @@ export class SignedXml {
     /**
      * Search for ancestor namespaces before canonicalization.
      */
-    if (Array.isArray(ref.transforms)) {
-      ref.ancestorNamespaces = utils.findAncestorNs(doc, ref.xpath, this.namespaceResolver);
-    }
+    ref.ancestorNamespaces = utils.findAncestorNs(doc, ref.xpath, this.namespaceResolver);
 
     const c14nOptions = {
       inclusiveNamespacesPrefixList: ref.inclusiveNamespacesPrefixList,
@@ -819,10 +817,6 @@ export class SignedXml {
       throw new Error("digestAlgorithm is required");
     }
 
-    if (!utils.isArrayHasLength(transforms)) {
-      throw new Error("transforms must contain at least one transform algorithm");
-    }
-
     this.references.push({
       xpath,
       transforms,
@@ -1155,32 +1149,36 @@ export class SignedXml {
           referenceElem.setAttribute("Type", ref.type);
         }
 
-        const transformsElem = signatureDoc.createElementNS(
-          signatureNamespace,
-          `${currentPrefix}Transforms`,
-        );
-
-        for (const trans of ref.transforms || []) {
-          const transform = this.findCanonicalizationAlgorithm(trans);
-          const transformElem = signatureDoc.createElementNS(
+        if (utils.isArrayHasLength(ref.transforms)) {
+          const transformsElem = signatureDoc.createElementNS(
             signatureNamespace,
-            `${currentPrefix}Transform`,
+            `${currentPrefix}Transforms`,
           );
-          transformElem.setAttribute("Algorithm", transform.getAlgorithmName());
 
-          if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
-            const inclusiveNamespacesElem = signatureDoc.createElementNS(
-              transform.getAlgorithmName(),
-              "InclusiveNamespaces",
+          for (const trans of ref.transforms) {
+            const transform = this.findCanonicalizationAlgorithm(trans);
+            const transformElem = signatureDoc.createElementNS(
+              signatureNamespace,
+              `${currentPrefix}Transform`,
             );
-            inclusiveNamespacesElem.setAttribute(
-              "PrefixList",
-              ref.inclusiveNamespacesPrefixList.join(" "),
-            );
-            transformElem.appendChild(inclusiveNamespacesElem);
+            transformElem.setAttribute("Algorithm", transform.getAlgorithmName());
+
+            if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
+              const inclusiveNamespacesElem = signatureDoc.createElementNS(
+                transform.getAlgorithmName(),
+                "InclusiveNamespaces",
+              );
+              inclusiveNamespacesElem.setAttribute(
+                "PrefixList",
+                ref.inclusiveNamespacesPrefixList.join(" "),
+              );
+              transformElem.appendChild(inclusiveNamespacesElem);
+            }
+
+            transformsElem.appendChild(transformElem);
           }
 
-          transformsElem.appendChild(transformElem);
+          referenceElem.appendChild(transformsElem);
         }
 
         // Get the canonicalized XML
@@ -1201,7 +1199,6 @@ export class SignedXml {
         );
         digestValueElem.textContent = digestAlgorithm.getHash(canonXml);
 
-        referenceElem.appendChild(transformsElem);
         referenceElem.appendChild(digestMethodElem);
         referenceElem.appendChild(digestValueElem);
 
@@ -1272,7 +1269,7 @@ export class SignedXml {
     const canonXml = node.cloneNode(true); // Deep clone
     let transformedXml: Node | string = canonXml;
 
-    transforms.forEach((transformName) => {
+    (transforms ?? []).forEach((transformName) => {
       if (isDomNode.isNodeLike(transformedXml)) {
         // If, after processing, `transformedNode` is a string, we can't do anymore transforms on it
         const transform = this.findCanonicalizationAlgorithm(transformName);
@@ -1286,6 +1283,27 @@ export class SignedXml {
       //<x xmlns:p='ns'><p:y/></x>
       //if only y is the node to sign then a string would be <p:y/> without the definition of the p namespace. probably xmldom toString() should have added it.
     });
+
+    // When the transform chain produces a DOM node (including the no-transform
+    // case), apply C14N so that the digest is computed over a canonical byte
+    // sequence. This mirrors what loadReference does on the verification side:
+    // it appends C14N when the transform list is empty or ends with
+    // enveloped-signature, ensuring signing and verification agree on the bytes.
+    if (typeof transformedXml === "string") {
+      return transformedXml;
+    }
+
+    // When there are no transforms, the XMLDSig processing model requires the
+    // node-set to be serialized via C14N before digesting. This mirrors what
+    // loadReference already does on the verification side (it appends C14N when
+    // the transform list is empty), so that signing and verification compute the
+    // same digest.
+    if (!utils.isArrayHasLength(transforms)) {
+      const c14n = this.findCanonicalizationAlgorithm(
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      );
+      return String(c14n.process(transformedXml, options));
+    }
 
     return transformedXml.toString();
   }
