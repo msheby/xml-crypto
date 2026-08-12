@@ -241,7 +241,7 @@ function findSubsetNSPrefixes(subset: Element): Set<string> {
   const subsetAttributes = subset.attributes;
   for (let k = 0; k < subsetAttributes.length; k++) {
     const nodeName = subsetAttributes[k].nodeName;
-    if (/^xmlns:?/.test(nodeName)) {
+    if (nodeName === "xmlns" || nodeName.startsWith("xmlns:")) {
       prefixes.add(nodeName.replace(/^xmlns:?/, ""));
     }
   }

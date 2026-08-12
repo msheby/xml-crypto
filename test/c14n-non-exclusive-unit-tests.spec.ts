@@ -142,6 +142,18 @@ describe("C14N non-exclusive canonicalization tests", function () {
     test_findAncestorNs(xml, xpath, expected);
   });
 
+  it("findAncestorNs: Should not suppress ancestor namespace for non-namespace attribute starting with 'xmlns'", function () {
+    // xmlnsfoo is an ordinary attribute, not a namespace declaration.
+    // findSubsetNSPrefixes must not add "foo" to the suppression set, so
+    // an inherited xmlns:foo declaration on an ancestor is still hoisted.
+    const xml =
+      "<root xmlns:foo='zzz'><child1><child2 xmlnsfoo='bar'></child2></child1></root>";
+    const xpath = "//*[local-name()='child2']";
+    const expected = [{ prefix: "foo", namespaceURI: "zzz" }];
+
+    test_findAncestorNs(xml, xpath, expected);
+  });
+
   // Tests for c14nCanonicalization
   it("C14n: Correctly picks up root ancestor namespace", function () {
     const xml = "<root xmlns:aaa='bbb'><child1><child2></child2></child1></root>";
