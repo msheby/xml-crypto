@@ -427,11 +427,17 @@ export class SignedXml {
     return this.getCanonXml([this.canonicalizationAlgorithm], signedInfo[0], c14nOptions);
   }
 
-  private getCanonReferenceXml(doc: Document, ref: Reference, node: Node) {
+  private getCanonReferenceXml(_doc: Document, ref: Reference, node: Node) {
     /**
-     * Search for ancestor namespaces before canonicalization.
+     * Derive ancestor namespaces from the specific node being digested, not by
+     * re-running ref.xpath. findAncestorNs uses only the first XPath match, so
+     * when multiple references are created for the same xpath pattern (e.g. via
+     * addAllReferences), references beyond the first are digested with the wrong
+     * ancestor namespace scope.
      */
-    ref.ancestorNamespaces = utils.findAncestorNs(doc, ref.xpath, this.namespaceResolver);
+    if (isDomNode.isElementNode(node)) {
+      ref.ancestorNamespaces = utils.findAncestorNsForNode(node);
+    }
 
     const c14nOptions = {
       inclusiveNamespacesPrefixList: ref.inclusiveNamespacesPrefixList,

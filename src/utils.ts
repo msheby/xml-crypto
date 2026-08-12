@@ -236,6 +236,49 @@ function isElementSubset(docSubset: Node[]): docSubset is Element[] {
   return docSubset.every((node) => isDomNode.isElementNode(node));
 }
 
+/** Deduplicate and filter ancestor namespaces for a given subset element. */
+function buildAncestorNsForElement(element: Element): NamespacePrefix[] {
+  const ancestorNs = collectAncestorNamespaces(element);
+  const ancestorNsWithoutDuplicate: NamespacePrefix[] = [];
+  for (let i = 0; i < ancestorNs.length; i++) {
+    let notOnTheList = true;
+    for (const v in ancestorNsWithoutDuplicate) {
+      if (ancestorNsWithoutDuplicate[v].prefix === ancestorNs[i].prefix) {
+        notOnTheList = false;
+        break;
+      }
+    }
+
+    if (notOnTheList) {
+      ancestorNsWithoutDuplicate.push(ancestorNs[i]);
+    }
+  }
+
+  // Remove namespaces which are already declared in the subset with the same prefix
+  const returningNs: NamespacePrefix[] = [];
+  const subsetNsPrefix = findNSPrefix(element);
+  for (const ns of ancestorNsWithoutDuplicate) {
+    if (ns.prefix !== subsetNsPrefix) {
+      returningNs.push(ns);
+    }
+  }
+
+  return returningNs;
+}
+
+/**
+ * Extract ancestor namespaces for a specific element node.
+ * Prefer this over `findAncestorNs` when the target element is already known,
+ * since `findAncestorNs` re-executes an XPath and uses the first match —
+ * which is incorrect when multiple nodes are referenced individually.
+ *
+ * @param element - The element whose ancestor namespace declarations to collect
+ * @returns i.e. [{prefix: "saml", namespaceURI: "urn:oasis:names:tc:SAML:2.0:assertion"}]
+ */
+export function findAncestorNsForNode(element: Element): NamespacePrefix[] {
+  return buildAncestorNsForElement(element);
+}
+
 /**
  * Extract ancestor namespaces in order to import it to root of document subset
  * which is being canonicalized for non-exclusive c14n.
@@ -264,33 +307,7 @@ export function findAncestorNs(
     throw new Error("Document subset must be list of elements");
   }
 
-  // Remove duplicate on ancestor namespace
-  const ancestorNs = collectAncestorNamespaces(docSubset[0]);
-  const ancestorNsWithoutDuplicate: NamespacePrefix[] = [];
-  for (let i = 0; i < ancestorNs.length; i++) {
-    let notOnTheList = true;
-    for (const v in ancestorNsWithoutDuplicate) {
-      if (ancestorNsWithoutDuplicate[v].prefix === ancestorNs[i].prefix) {
-        notOnTheList = false;
-        break;
-      }
-    }
-
-    if (notOnTheList) {
-      ancestorNsWithoutDuplicate.push(ancestorNs[i]);
-    }
-  }
-
-  // Remove namespaces which are already declared in the subset with the same prefix
-  const returningNs: NamespacePrefix[] = [];
-  const subsetNsPrefix = findNSPrefix(docSubset[0]);
-  for (const ancestorNs of ancestorNsWithoutDuplicate) {
-    if (ancestorNs.prefix !== subsetNsPrefix) {
-      returningNs.push(ancestorNs);
-    }
-  }
-
-  return returningNs;
+  return buildAncestorNsForElement(docSubset[0]);
 }
 
 export function validateDigestValue(digest, expectedDigest) {
