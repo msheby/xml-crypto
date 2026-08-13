@@ -287,17 +287,10 @@ export function findAncestorNs(
   // Remove duplicate on ancestor namespace
   const ancestorNs = collectAncestorNamespaces(docSubset[0]);
   const ancestorNsWithoutDuplicate: NamespacePrefix[] = [];
-  for (let i = 0; i < ancestorNs.length; i++) {
-    let notOnTheList = true;
-    for (const v in ancestorNsWithoutDuplicate) {
-      if (ancestorNsWithoutDuplicate[v].prefix === ancestorNs[i].prefix) {
-        notOnTheList = false;
-        break;
-      }
-    }
-
-    if (notOnTheList) {
-      ancestorNsWithoutDuplicate.push(ancestorNs[i]);
+  for (const ns of ancestorNs) {
+    const isDuplicate = ancestorNsWithoutDuplicate.some((seen) => seen.prefix === ns.prefix);
+    if (!isDuplicate) {
+      ancestorNsWithoutDuplicate.push(ns);
     }
   }
 
