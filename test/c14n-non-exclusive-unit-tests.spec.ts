@@ -122,8 +122,7 @@ describe("C14N non-exclusive canonicalization tests", function () {
     // declares xmlns:enc.  The default namespace must not be hoisted because
     // the C14N serializer already renders it; previously findNSPrefix stopped
     // at the first xmlns:* attribute ("enc") and missed the inherited "".
-    const xml =
-      "<root xmlns='bbb'><child1><child2 xmlns:enc='ccc'></child2></child1></root>";
+    const xml = "<root xmlns='bbb'><child1><child2 xmlns:enc='ccc'></child2></child1></root>";
     const xpath = "//*[local-name()='child2']";
     const expected = [];
 
@@ -146,8 +145,7 @@ describe("C14N non-exclusive canonicalization tests", function () {
     // xmlnsfoo is an ordinary attribute, not a namespace declaration.
     // findSubsetNSPrefixes must not add "foo" to the suppression set, so
     // an inherited xmlns:foo declaration on an ancestor is still hoisted.
-    const xml =
-      "<root xmlns:foo='zzz'><child1><child2 xmlnsfoo='bar'></child2></child1></root>";
+    const xml = "<root xmlns:foo='zzz'><child1><child2 xmlnsfoo='bar'></child2></child1></root>";
     const xpath = "//*[local-name()='child2']";
     const expected = [{ prefix: "foo", namespaceURI: "zzz" }];
 
@@ -255,8 +253,7 @@ describe("C14N non-exclusive canonicalization tests", function () {
     // leaving the default namespace in the ancestor list; the C14N serializer
     // then rendered it twice — once from the element itself and once from the
     // hoisted ancestor entry.
-    const xml =
-      "<root xmlns='bbb'><child1><child2 xmlns:enc='ccc'></child2></child1></root>";
+    const xml = "<root xmlns='bbb'><child1><child2 xmlns:enc='ccc'></child2></child1></root>";
     const xpath = "//*[local-name()='child2']";
     const expected = '<child2 xmlns="bbb" xmlns:enc="ccc"></child2>';
 
